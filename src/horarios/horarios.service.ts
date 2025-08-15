@@ -354,8 +354,20 @@ export class HorariosService {
       const diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
       const horarioOrganizado = {};
 
+      // Función para normalizar el formato de días
+      const normalizarDia = (dia) => {
+        const mapeo = {
+          'LUNES': 'Lunes',
+          'MARTES': 'Martes', 
+          'MIÉRCOLES': 'Miércoles',
+          'JUEVES': 'Jueves',
+          'VIERNES': 'Viernes'
+        };
+        return mapeo[dia] || dia;
+      };
+
       diasSemana.forEach(dia => {
-        horarioOrganizado[dia] = slots.filter(slot => slot.dia === dia);
+        horarioOrganizado[dia] = slots.filter(slot => normalizarDia(slot.dia) === dia);
       });
 
       return {
