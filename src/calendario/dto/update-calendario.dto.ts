@@ -9,5 +9,6 @@ export class UpdateCalendarioDto {
   actividadId?: number | null; // Añadir si se puede actualizar
   grupoId?: number | null; // Añadir si se puede actualizar
   paraTodosLosGrupos?: boolean; // Añadir si se puede actualizar
+  salonId?: number | null; // Añadir si se puede actualizar
   requiereNotificacion?: boolean; // Añadir si se puede actualizar
 }

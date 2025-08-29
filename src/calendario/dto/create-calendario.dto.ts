@@ -11,6 +11,7 @@ export class CreateCalendarioDto {
   prioridad: 'alta' | 'media' | 'baja';
   grupo_id?: number; // Cambiado de grupoId, hacerlo opcional si paraTodosLosGrupos es true
   paraTodosLosGrupos?: boolean; // Añadido
+  salon_id?: number; // Añadido: ID del salón asignado al evento
   enviar_notificacion: boolean; // Cambiado de enviarNotificacion -> Considerar si este campo es redundante con requiereNotificacion
   requiereNotificacion?: boolean; // Añadido (opcional, basado en el servicio)
   tiempo_recordatorio?: number; // Cambiado de tiempoRecordatorio, hacerlo opcional

@@ -12,6 +12,7 @@ import { actividades } from '../database/schema/actividades'; // Importa el esqu
 import { usuarios } from '../database/schema/usuarios';
 import { grupos_alumnos } from '../database/schema/grupos_alumnos';
 import { alumnos } from '../database/schema/alumnos'; // Importa el esquema de alumnos
+import { salones } from '../database/schema/salones'; // Importa el esquema de salones
 import { eq, and, gte, lte, or, inArray } from 'drizzle-orm';
 import { NotificacionesService } from '../notificaciones/notificaciones.service'; // Importa el servicio de notificaciones
 import { CreateCalendarioDto } from './dto/create-calendario.dto';
@@ -87,6 +88,7 @@ export class CalendarioService {
           asignadoPorUsuarioId: user.id, // Obtén esto del usuario autenticado
           grupoId: createCalendarioDto.grupo_id, // Usar grupo_id del DTO
           paraTodosLosGrupos: createCalendarioDto.paraTodosLosGrupos || false, // Usar paraTodosLosGrupos del DTO
+          salonId: createCalendarioDto.salon_id, // Usar salon_id del DTO
           requiereNotificacion: createCalendarioDto.requiereNotificacion || false, // Usar requiereNotificacion del DTO
           fechaHoraNotificacion: fechaHoraNotificacion, // Guardar como timestamp
         })
@@ -421,31 +423,52 @@ export class CalendarioService {
   // y el campo tiempoRecordatorio no existe en el nuevo esquema.
 
   async getEventosBuzonParaUsuario(usuarioId: number) {
+    console.log(`Buscando eventos para usuario ID: ${usuarioId}`);
+    
     // 1. Buscar el alumno_id correspondiente al usuarioId autenticado
     const alumno = await db
       .select({ id: alumnos.id })
       .from(alumnos)
       .where(eq(alumnos.usuario_id, usuarioId));
-    if (!alumno.length) return [];
+    
+    console.log(`Alumno encontrado:`, alumno);
+    
+    if (!alumno.length) {
+      console.log('No se encontró alumno para este usuario, retornando array vacío');
+      return [];
+    }
+    
     const alumnoId = alumno[0].id;
+    console.log(`Alumno ID: ${alumnoId}`);
 
     // 2. Obtener los grupos a los que pertenece el alumno
     const gruposAlumno = await db
       .select({ grupo_id: grupos_alumnos.grupo_id })
       .from(grupos_alumnos)
       .where(eq(grupos_alumnos.alumno_id, alumnoId));
+    
     const grupoIds = gruposAlumno.map(g => g.grupo_id).filter(id => id !== null);
+    console.log(`Grupos del alumno:`, grupoIds);
 
-    // 3. Obtener eventos de calendario para esos grupos o para el usuario
+    // 3. Obtener eventos de calendario para esos grupos, para todos los grupos, o para el usuario
+    let whereConditions = [
+      eq(calendario.paraTodosLosGrupos, true),
+      eq(calendario.asignadoPorUsuarioId, usuarioId)
+    ];
+    
+    // Solo agregar la condición de grupos si el alumno tiene grupos
+    if (grupoIds.length > 0) {
+      whereConditions.push(inArray(calendario.grupoId, grupoIds));
+    }
+    
     const eventosCalendario = await db
       .select()
       .from(calendario)
-      .where(
-        or(
-          inArray(calendario.grupoId, grupoIds),
-          eq(calendario.asignadoPorUsuarioId, usuarioId)
-        )
-      );
+      .where(or(...whereConditions));
+    
+    console.log(`Eventos encontrados:`, eventosCalendario.length);
+    console.log(`Eventos para todos los grupos:`, eventosCalendario.filter(e => e.paraTodosLosGrupos));
+    console.log(`Eventos para grupos específicos:`, eventosCalendario.filter(e => e.grupoId && grupoIds.includes(e.grupoId)));
 
     // 4. Obtener notificaciones para el usuario
     const notificacionesUsuario = await db
@@ -467,10 +490,22 @@ export class CalendarioService {
       actividadesMap = Object.fromEntries(acts.map(a => [a.id, a]));
     }
 
-    // 6. Unir la información y marcar prioritarios
+    // 6. Obtener salones relacionados
+    const salonIds = [...new Set(eventosCalendario.map(e => e.salonId).filter(id => id !== null))];
+    let salonesMap = {};
+    if (salonIds.length > 0) {
+      const salons = await db
+        .select()
+        .from(salones)
+        .where(inArray(salones.id, salonIds));
+      salonesMap = Object.fromEntries(salons.map(s => [s.id, s]));
+    }
+
+    // 7. Unir la información y marcar prioritarios
     const eventos = eventosCalendario.map(ev => {
       const noti = notificacionPorCalendario[ev.id];
       const actividad = ev.actividadId ? actividadesMap[ev.actividadId] : null;
+      const salon = ev.salonId ? salonesMap[ev.salonId] : null;
       return {
         id: ev.id,
         titulo: ev.titulo,
@@ -481,14 +516,19 @@ export class CalendarioService {
         hora_fin: ev.horaFin,
         asignado_por_usuario_id: ev.asignadoPorUsuarioId,
         grupo_id: ev.grupoId,
+        salon: salon,
         actividad: actividad,
         prioridad: !!noti,
         notificacion: noti || null
       };
     });
 
-    // 7. Ordenar: prioritarios primero
+    // 8. Ordenar: prioritarios primero
     eventos.sort((a, b) => (b.prioridad ? 1 : 0) - (a.prioridad ? 1 : 0));
+    
+    console.log(`Eventos finales retornados:`, eventos.length);
+    console.log(`IDs de eventos retornados:`, eventos.map(e => e.id));
+    
     return eventos;
   }
 }

@@ -2,6 +2,7 @@ import { sqliteTable, integer, text } from 'drizzle-orm/sqlite-core';
 import { actividades } from './actividades'; // Asegúrate de que la ruta sea correcta
 import { grupos } from './grupos'; // Asegúrate de que la ruta sea correcta y el archivo exista
 import { usuarios } from './usuarios'; // Asegúrate de que la ruta sea correcta y el archivo exista
+import { salones } from './salones'; // Importar salones para la referencia
 
 export const calendario = sqliteTable('calendario', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -26,6 +27,9 @@ export const calendario = sqliteTable('calendario', {
   paraTodosLosGrupos: integer('para_todos_los_grupos', { mode: 'boolean' })
     .notNull()
     .default(false), // Si es para todos los grupos del usuario/admin
+
+  // Información del salón
+  salonId: integer('salon_id').references(() => salones.id), // Opcional: salón asignado al evento
 
   // Configuración de Notificación
   requiereNotificacion: integer('requiere_notificacion', { mode: 'boolean' }).default(false),
